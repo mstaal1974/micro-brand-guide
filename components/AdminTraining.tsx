@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
-import { Lock, Unlock, Save, Upload, FileText, ShieldCheck, AlertCircle, Link as LinkIcon, Plus, X, Trash2, Calendar, Wand2, Download, ArrowUpRight, Play, Linkedin, Instagram, Facebook, Video } from 'lucide-react';
+import { Lock, Unlock, Save, Upload, FileText, ShieldCheck, AlertCircle, Link as LinkIcon, Plus, X, Trash2, Calendar, Wand2, Download, ArrowUpRight, Play, Linkedin, Instagram, Facebook, Video, Search } from 'lucide-react';
 
-// Declare global types for external libraries
 declare global {
   interface Window {
     pdfjsLib: any;
     mammoth: any;
     jspdf: any;
+    autoTable: any;
+    google: any;
   }
 }
 
@@ -26,8 +26,6 @@ interface PlanItem {
 interface AdminTrainingProps {
     onSendToAI: (data: { scenePrompt: string, headline: string, caption: string, mode?: 'image' | 'video' }) => void;
 }
-
-// --- OFFICIAL DATA FROM STRATEGY DOCUMENT ---
 
 const OFFICIAL_STRATEGY_TEXT = `
 BLOCKSURE MARKETING STRATEGY (Consumers + RTOs)
@@ -52,7 +50,6 @@ BLOCKSURE MARKETING STRATEGY (Consumers + RTOs)
 `;
 
 const OFFICIAL_CALENDAR_DATA: PlanItem[] = [
-  // --- LINKEDIN (WEEKS 1-12) ---
   {
     platform: 'LinkedIn', week: 'W1', day: 'Mon', format: 'Carousel', theme: 'Credential Integrity',
     headline: 'Stop issuing "pretty badges." Start issuing proof.',
@@ -125,113 +122,90 @@ const OFFICIAL_CALENDAR_DATA: PlanItem[] = [
     visualPrompt: 'Simple timeline graphic with milestones: First Badge -> Marketplace Embedded -> Social Calendar -> First Bundle.',
     caption: '90-day plan to activation. Get your marketplace embedded and your first pathway live.'
   },
-  // W5
   { platform: 'LinkedIn', week: 'W5', day: 'Mon', format: 'Carousel', theme: 'Workflow', headline: 'From course to credential in one workflow', visualPrompt: 'Step-by-step carousel with numbered panels; include one marketplace course card screenshot.', caption: 'Show the workflow: course mapping → badge → skills inherited → listing.' },
   { platform: 'LinkedIn', week: 'W5', day: 'Wed', format: 'Static', theme: 'Analytics', headline: 'Promotion of excellence: rankings + outcomes', visualPrompt: 'Dashboard-style mockup: "outcomes", "engagement", "enrolment sources".', caption: 'Position outcomes reporting as differentiation for providers.' },
   { platform: 'LinkedIn', week: 'W5', day: 'Fri', format: 'Demo clip', theme: 'Scheduling', headline: 'Schedule content across platforms in one place', visualPrompt: 'Screen record calendar view; overlay "3 posts/week auto-scheduled".', caption: 'Show MicroPromote scheduling suite + platform connections.' },
-  // W6
   { platform: 'LinkedIn', week: 'W6', day: 'Mon', format: 'Carousel', theme: 'Chaos Fix', headline: 'Credential chaos is real. Here’s the fix.', visualPrompt: '2-column comparison slides (Chaos vs Order); end with Blocksure ecosystem diagram.', caption: 'Contrast: badge-only tools vs skills infrastructure stack.' },
   { platform: 'LinkedIn', week: 'W6', day: 'Wed', format: 'Static', theme: 'Metrics', headline: '3 metrics to watch after launch', visualPrompt: 'Minimal chart graphic with "target ranges" placeholders for Impressions, Clicks, CTR.', caption: 'Impressions → clicks → CTR, plus marketplace conversion.' },
   { platform: 'LinkedIn', week: 'W6', day: 'Fri', format: 'Demo clip', theme: 'Bundling', headline: 'Course bundling: manual or AI suggested', visualPrompt: 'Show bundle creation + pathway builder view UI.', caption: 'Increase LTV and completion by bundling into pathways.' },
-  // W7
   { platform: 'LinkedIn', week: 'W7', day: 'Mon', format: 'Carousel', theme: 'QA', headline: '“Quality assured” doesn’t mean slow.', visualPrompt: 'Use the QA decision-flow as simplified infographic.', caption: 'Explain QA overlay decisions + issuing confidence.' },
   { platform: 'LinkedIn', week: 'W7', day: 'Wed', format: 'Static', theme: 'Branding', headline: 'Your branded marketplace, your rules', visualPrompt: 'Before/after mock: generic marketplace vs branded storefront.', caption: 'Reinforce branding + course-only filters + website integration.' },
   { platform: 'LinkedIn', week: 'W7', day: 'Fri', format: 'Demo clip', theme: 'Aggregation', headline: 'Skills aggregator: import badges + build analytics', visualPrompt: 'Profile page + skill charts highlight; zoom on "imports badges".', caption: 'Show aggregation and analytics for providers/industry.' },
-  // W8
   { platform: 'LinkedIn', week: 'W8', day: 'Mon', format: 'Carousel', theme: 'Consistency', headline: 'RTO marketing isn’t the problem. Consistency is.', visualPrompt: 'Carousel: Week plan snapshots + "generated from one course".', caption: 'Show how MicroPromote turns course knowledge into repeatable campaigns.' },
   { platform: 'LinkedIn', week: 'W8', day: 'Wed', format: 'Static', theme: 'Enrolment', headline: '2-click enrolment + payment reduces drop-off', visualPrompt: 'Flow graphic: Browse → Apply code → Pay → Confirm.', caption: 'Highlight friction removal: promo codes, ratings, 2-click pay.' },
   { platform: 'LinkedIn', week: 'W8', day: 'Fri', format: 'Demo clip', theme: 'Inheritance', headline: 'Course skills inherit through badges', visualPrompt: 'Course page screenshot + badge skills chips callouts.', caption: 'Explain inheritance: course completion updates skill evidence.' },
-  // W9
   { platform: 'LinkedIn', week: 'W9', day: 'Mon', format: 'Carousel', theme: 'Employer Value', headline: 'What employers get when you issue better credentials', visualPrompt: 'Carousel: Employer lens, with "before/after" hiring signals.', caption: 'Employer value: machine-readable skills, faster verification, better matching.' },
   { platform: 'LinkedIn', week: 'W9', day: 'Wed', format: 'Static', theme: 'Reporting', headline: 'Monthly “performance snapshot” email idea', visualPrompt: 'Mock one-page report preview.', caption: 'Offer a template: report enrolments + top posts + CTR + next actions.' },
   { platform: 'LinkedIn', week: 'W9', day: 'Fri', format: 'Demo clip', theme: 'Connections', headline: 'Link your social accounts once, manage all', visualPrompt: 'Screen record "connected accounts" page with icons.', caption: 'Single sign-in + connected accounts.' },
-  // W10
   { platform: 'LinkedIn', week: 'W10', day: 'Mon', format: 'Carousel', theme: 'Ecosystem', headline: 'The “skills currency” model — in one picture', visualPrompt: 'Clean ecosystem diagram with highlights.', caption: 'Teach the ecosystem: RSDs → credentials → aggregator → marketplace.' },
   { platform: 'LinkedIn', week: 'W10', day: 'Wed', format: 'Static', theme: 'Roadmap', headline: 'RTOs: your next 90 days, mapped', visualPrompt: 'Timeline graphic with 4 milestones.', caption: 'Post a mini roadmap: first badge, first pathway, first campaign, first report.' },
   { platform: 'LinkedIn', week: 'W10', day: 'Fri', format: 'Demo clip', theme: 'Analytics', headline: 'Analytics: impressions, clicks, reach, CTR', visualPrompt: 'Screen record dashboard; overlay labels for each metric.', caption: 'Show MicroPromote analytics dashboards.' },
-  // W11
   { platform: 'LinkedIn', week: 'W11', day: 'Mon', format: 'Carousel', theme: 'Security', headline: 'Credential integrity: 3 levels of security', visualPrompt: '3-tier pyramid graphic + small verification screenshot.', caption: 'Explain: linked/assured, blockchain secured, integration API, revocation.' },
   { platform: 'LinkedIn', week: 'W11', day: 'Wed', format: 'Static', theme: 'LMS Import', headline: 'Course import from LMS: less admin, faster revenue', visualPrompt: 'Split graphic: LMS logo → marketplace course tiles.', caption: 'Highlight import + course management + promotions scheduling.' },
   { platform: 'LinkedIn', week: 'W11', day: 'Fri', format: 'Demo clip', theme: 'Promos', headline: 'Promo codes + boosting discounts (scheduled)', visualPrompt: 'Screen record discount scheduling UI; overlay "set + forget".', caption: 'Demonstrate "boosting discount" scheduling and promo codes.' },
-  // W12
   { platform: 'LinkedIn', week: 'W12', day: 'Mon', format: 'Carousel', theme: 'Retro', headline: 'What we learned in 90 days (template)', visualPrompt: 'Carousel with 4 slides: KPI, funnel, best posts, next tests.', caption: 'Share a "post-launch retro" framework: content → conversion → optimisation.' },
   { platform: 'LinkedIn', week: 'W12', day: 'Wed', format: 'Static', theme: 'Start', headline: 'Ready to be an issuer? Start with one course.', visualPrompt: 'One hero mock: course card → badge → marketplace listing.', caption: 'Low-friction call: "Pick one course, we’ll map it, issue a badge, and publish it."' },
   { platform: 'LinkedIn', week: 'W12', day: 'Fri', format: 'Demo clip', theme: 'Loop', headline: 'MicroPromote: generate, schedule, measure — loop', visualPrompt: 'Fast montage: generator → calendar → analytics → repeat icon.', caption: 'Wrap the story: content engine + scheduling + analytics creates consistency.' },
-
-  // --- INSTAGRAM (WEEKS 1-12) ---
-  {
-    platform: 'Instagram', week: 'W1', day: 'Mon', format: 'Reel', theme: 'Skills Wallet',
+  { platform: 'Instagram', week: 'W1', day: 'Mon', format: 'Reel', theme: 'Skills Wallet',
     headline: 'Your resume tells a story. Your wallet proves it.',
     visualPrompt: 'Face-to-camera + quick screen recording insert; overlay text "Proof > claims". Veri holding phone showing wallet.',
     caption: 'A resume lists experience. A verified microcredential proves it. Create your wallet in 2 minutes.'
   },
-  {
-    platform: 'Instagram', week: 'W1', day: 'Wed', format: 'Carousel', theme: 'Stacking',
+  { platform: 'Instagram', week: 'W1', day: 'Wed', format: 'Carousel', theme: 'Stacking',
     headline: 'Stack skills like levels in a game',
     visualPrompt: 'Pathway ladder graphic + badge mockups; human photo background. Slide 1: Start Small. Slide 2: Earn Proof. Slide 3: Stack.',
     caption: 'Start small. Earn proof. Stack. Get noticed. Browse pathway bundles today.'
   },
-  {
-    platform: 'Instagram', week: 'W1', day: 'Fri', format: 'Static', theme: 'Spotlight',
+  { platform: 'Instagram', week: 'W1', day: 'Fri', format: 'Static', theme: 'Spotlight',
     headline: 'Course spotlight: skill you can prove this month',
     visualPrompt: 'Course card mockup + 3 bullet overlays + subtle badge icon. Professional but vibrant.',
     caption: 'What you’ll learn + proof you’ll earn + who it’s for. Tap to enrol.'
   },
-  {
-    platform: 'Instagram', week: 'W2', day: 'Mon', format: 'Reel', theme: 'Underselling',
+  { platform: 'Instagram', week: 'W2', day: 'Mon', format: 'Reel', theme: 'Underselling',
     headline: '3 signs you’re under-selling your skills',
     visualPrompt: 'Talking head + "checklist" overlay. 1) Vague bullets, 2) No evidence, 3) No pathway.',
     caption: '1) vague bullet points, 2) no evidence, 3) no pathway. Fix: wallet + verifiable credentials.'
   },
-  {
-    platform: 'Instagram', week: 'W2', day: 'Wed', format: 'Carousel', theme: 'Verification',
+  { platform: 'Instagram', week: 'W2', day: 'Wed', format: 'Carousel', theme: 'Verification',
     headline: 'What is a "verifiable credential"?',
     visualPrompt: 'Credential mockups + "verified" check marks; minimal text. Swipe to see verification screen.',
     caption: 'Shareable, instantly verifiable, revocable—so employers trust it.'
   },
-  {
-    platform: 'Instagram', week: 'W2', day: 'Fri', format: 'Reel', theme: 'Goal Setting',
+  { platform: 'Instagram', week: 'W2', day: 'Fri', format: 'Reel', theme: 'Goal Setting',
     headline: 'Pick your goal → get your next skill steps',
     visualPrompt: 'Screen capture of goal selection + recommendations list. Arrows pointing to "Promotion", "Career Change".',
     caption: 'Don\'t guess. Promotion / career change / first job. We map the skills.'
   },
-  {
-    platform: 'Instagram', week: 'W3', day: 'Mon', format: 'Carousel', theme: 'Progress',
+  { platform: 'Instagram', week: 'W3', day: 'Mon', format: 'Carousel', theme: 'Progress',
     headline: 'Progress that employers can see',
     visualPrompt: 'Milestone timeline with badges at each step. Bright, encouraging visuals.',
     caption: 'Stackable micro-credentials = visible milestones. Start your first milestone.'
   },
-  {
-    platform: 'Instagram', week: 'W3', day: 'Wed', format: 'Reel', theme: 'Experience',
+  { platform: 'Instagram', week: 'W3', day: 'Wed', format: 'Reel', theme: 'Experience',
     headline: 'How to turn "experience" into proof',
     visualPrompt: 'Split-screen: person + UI flow. Resume -> Skills Extracted -> Gaps -> Course.',
     caption: 'Turn your resume into machine-readable proof.'
   },
-  {
-    platform: 'Instagram', week: 'W3', day: 'Fri', format: 'Static', theme: 'Share',
+  { platform: 'Instagram', week: 'W3', day: 'Fri', format: 'Static', theme: 'Share',
     headline: 'Friday win: share your credential link',
     visualPrompt: 'Minimal quote-card + small badge icon. "Share one proof this week."',
     caption: 'Share one proof this week. Employers want evidence, not just adjectives. Link in bio.'
   },
-  {
-    platform: 'Instagram', week: 'W4', day: 'Mon', format: 'Reel', theme: 'Currency',
+  { platform: 'Instagram', week: 'W4', day: 'Mon', format: 'Reel', theme: 'Currency',
     headline: 'Skills currency in 20 seconds',
     visualPrompt: 'Fast explainer: skills -> credential -> wallet -> opportunities. Quick cuts + animated arrows.',
     caption: 'Fast explainer: skills → credential → wallet → opportunities. Start your wallet.'
   },
-  {
-    platform: 'Instagram', week: 'W4', day: 'Wed', format: 'Carousel', theme: 'Pathways',
+  { platform: 'Instagram', week: 'W4', day: 'Wed', format: 'Carousel', theme: 'Pathways',
     headline: 'Choose-your-own-path learning',
     visualPrompt: 'Pathway map screenshot + highlighted next nodes. "Without wasting time" subtitle.',
     caption: 'Explain dynamic pathways + stacking + marketplace browsing. Explore pathways.'
   },
-  {
-    platform: 'Instagram', week: 'W4', day: 'Fri', format: 'Reel', theme: 'Promise',
+  { platform: 'Instagram', week: 'W4', day: 'Fri', format: 'Reel', theme: 'Promise',
     headline: 'One course. One credential. One shareable proof.',
     visualPrompt: 'Talking head + credential mock overlay. Simple promise.',
     caption: 'One course. One credential. One shareable proof. Tap to start.'
   },
-  // W5-W12 IG
   { platform: 'Instagram', week: 'W5', day: 'Mon', format: 'Carousel', theme: 'Power Skills', headline: 'The 5 skills your future self will thank you for', visualPrompt: 'Icon-led slides + badge placeholders.', caption: 'List 5 "power skills" and link to "prove them" with credentials.' },
   { platform: 'Instagram', week: 'W5', day: 'Wed', format: 'Reel', theme: 'Interview', headline: 'How to explain your skills in interviews', visualPrompt: 'On-screen "interview script" text.', caption: 'Script: "I earned X, verified here, demonstrated by Y."' },
   { platform: 'Instagram', week: 'W5', day: 'Fri', format: 'Static', theme: 'Challenge', headline: 'Weekend challenge: complete one micro-module', visualPrompt: 'Minimal challenge graphic.', caption: 'Motivation post + reminder "small wins stack."' },
@@ -256,81 +230,66 @@ const OFFICIAL_CALENDAR_DATA: PlanItem[] = [
   { platform: 'Instagram', week: 'W12', day: 'Mon', format: 'Reel', theme: 'Recap', headline: '12-week recap: what you can do now', visualPrompt: 'Montage of best moments + CTA.', caption: 'Recap outcomes: wallet, first credential, first stack, share proof.' },
   { platform: 'Instagram', week: 'W12', day: 'Wed', format: 'Carousel', theme: 'Next 90', headline: 'Your next 90 days: a simple pathway plan', visualPrompt: 'Plan graphic + icons + "save this".', caption: 'Offer a 3-step path; link to marketplace.' },
   { platform: 'Instagram', week: 'W12', day: 'Fri', format: 'Reel', theme: 'Push', headline: 'Final push: create your wallet in 2 minutes', visualPrompt: 'Timer overlay + screen capture.', caption: 'Direct CTA, minimal words.' },
-
-  // --- TIKTOK (WEEKS 1-12) ---
-  {
-    platform: 'TikTok', week: 'W1', day: 'Mon', format: '20s Video', theme: 'Currency',
+  { platform: 'TikTok', week: 'W1', day: 'Mon', format: '20s Video', theme: 'Currency',
     headline: '“Skills are currency” — here’s what that means',
     visualPrompt: 'Face cam + animated text "Degrees vs Skills". 1 quick UI flash of wallet. Upbeat energy.',
     caption: 'Degrees tell where you studied. Skills tell what you can do. A skills wallet stores proof. Create yours in 2 mins.'
   },
-  {
-    platform: 'TikTok', week: 'W1', day: 'Wed', format: '25s Video', theme: 'Underselling',
+  { platform: 'TikTok', week: 'W1', day: 'Wed', format: '25s Video', theme: 'Underselling',
     headline: '3 steps to stop underselling yourself',
     visualPrompt: 'Checklist overlay + "ding" transitions. Veri pointing to 1, 2, 3.',
     caption: 'Step 1: pick goal role. Step 2: map gaps. Step 3: earn verifiable proof.'
   },
-  {
-    platform: 'TikTok', week: 'W1', day: 'Fri', format: '30s Video', theme: 'Verification',
+  { platform: 'TikTok', week: 'W1', day: 'Fri', format: '30s Video', theme: 'Verification',
     headline: 'What happens when an employer clicks verify?',
     visualPrompt: 'Screen recording insert of verification process; blur personal info. "Verified" stamp effect.',
     caption: 'They see it’s real—instantly. No calling universities. Just proof.'
   },
-  {
-    platform: 'TikTok', week: 'W2', day: 'Mon', format: '20s Video', theme: 'Scam vs Smart',
+  { platform: 'TikTok', week: 'W2', day: 'Mon', format: '20s Video', theme: 'Scam vs Smart',
     headline: 'Micro-credentials: scam or smart?',
     visualPrompt: 'Split-screen myth vs fact text. Veri shaking head at myth, nodding at fact.',
     caption: 'Myth: They are fake. Fact: If it’s verifiable, aligned, and stackable—it’s valuable.'
   },
-  {
-    platform: 'TikTok', week: 'W2', day: 'Wed', format: '25s Video', theme: 'Fast Choice',
+  { platform: 'TikTok', week: 'W2', day: 'Wed', format: '25s Video', theme: 'Fast Choice',
     headline: 'How to choose a course (fast)',
     visualPrompt: 'Cut to course card and badge mock. Fast pacing.',
     caption: '1. What skill proof do I get? 2. Does it stack? 3. Can I share it?'
   },
-  {
-    platform: 'TikTok', week: 'W2', day: 'Fri', format: '30s Video', theme: 'Career Change',
+  { platform: 'TikTok', week: 'W2', day: 'Fri', format: '30s Video', theme: 'Career Change',
     headline: 'Career change? Don’t guess your next step',
     visualPrompt: 'On-screen arrows + UI flashes. Goal -> Pathway -> Credential.',
     caption: 'Show: goal → recommended pathway → first credential pick.'
   },
-  {
-    platform: 'TikTok', week: 'W3', day: 'Mon', format: '15s Video', theme: 'No Time',
+  { platform: 'TikTok', week: 'W3', day: 'Mon', format: '15s Video', theme: 'No Time',
     headline: '“No time” — do 10 minutes',
     visualPrompt: 'Timer overlay; quick motivational tone. Clock ticking sound fx.',
     caption: 'Small wins stack. Start with one micro-module today.'
   },
-  {
-    platform: 'TikTok', week: 'W3', day: 'Wed', format: '30s Video', theme: 'Flow',
+  { platform: 'TikTok', week: 'W3', day: 'Wed', format: '30s Video', theme: 'Flow',
     headline: 'Resume → skills → gaps (in one flow)',
     visualPrompt: 'Screen recording insert + captions. Scanning a resume animation.',
     caption: 'Extract skills, find gaps, get recommendations. All in one flow.'
   },
-  {
-    platform: 'TikTok', week: 'W3', day: 'Fri', format: '25s Video', theme: 'Cheat Code',
+  { platform: 'TikTok', week: 'W3', day: 'Fri', format: '25s Video', theme: 'Cheat Code',
     headline: 'Stacking = the cheat code for confidence',
     visualPrompt: 'Animated ladder + badge icons. "Level Up" graphical style.',
     caption: 'One credential proves one thing. Three stacked proves job-ready.'
   },
-  {
-    platform: 'TikTok', week: 'W4', day: 'Mon', format: '25s Video', theme: 'Prove It',
+  { platform: 'TikTok', week: 'W4', day: 'Mon', format: '25s Video', theme: 'Prove It',
     headline: 'Stop writing “good communication” — prove it',
     visualPrompt: 'Text overlay "prove it" + credential mock. Veri looking skeptical then happy.',
     caption: 'Evidence beats adjectives. Earn proof and link it.'
   },
-  {
-    platform: 'TikTok', week: 'W4', day: 'Wed', format: '30s Video', theme: 'Wallet Tour',
+  { platform: 'TikTok', week: 'W4', day: 'Wed', format: '30s Video', theme: 'Wallet Tour',
     headline: 'What is a skills wallet?',
     visualPrompt: 'Tour-style screen recording, fast cuts. Swipe through sections.',
     caption: 'It’s your portable proof: skills + credentials + pathways.'
   },
-  {
-    platform: 'TikTok', week: 'W4', day: 'Fri', format: '20s Video', theme: 'One Click',
+  { platform: 'TikTok', week: 'W4', day: 'Fri', format: '20s Video', theme: 'One Click',
     headline: 'One-click share: the best part',
     visualPrompt: 'Show share UI; big captions. Sending a link.',
     caption: 'Send proof, not paragraphs. One click.'
   },
-  // W5-W12 TT
   { platform: 'TikTok', week: 'W5', day: 'Mon', format: '25s Video', theme: 'Behind', headline: '“I’m behind” → “I’m building proof”', visualPrompt: 'Empathetic tone; subtitles. Veri comforting.', caption: 'Reframe + tiny action: create wallet, pick 1 skill.' },
   { platform: 'TikTok', week: 'W5', day: 'Wed', format: '30s Video', theme: 'Interview', headline: 'How to talk about your credential in interviews', visualPrompt: 'Script overlay; quick example.', caption: 'Give a 2-sentence script + show credential.' },
   { platform: 'TikTok', week: 'W5', day: 'Fri', format: '20s Video', theme: 'Challenge', headline: 'Weekend challenge: earn one milestone', visualPrompt: 'Challenge graphic overlays.', caption: 'One small win. Then share it.' },
@@ -361,28 +320,25 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
   const [isLocked, setIsLocked] = useState(true);
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'knowledge' | 'planner'>('knowledge');
-  
-  // Knowledge Base State
   const [strategyText, setStrategyText] = useState(OFFICIAL_STRATEGY_TEXT);
   const [error, setError] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
-  
-  // Planner State
-  const [plannerStep, setPlannerStep] = useState(2); // Default to viewing the plan
+  const [plannerStep, setPlannerStep] = useState(2);
   const [targetAudience, setTargetAudience] = useState('');
   const [goals, setGoals] = useState('');
   const [platforms, setPlatforms] = useState('LinkedIn, Twitter/X');
   const [generatedPlan, setGeneratedPlan] = useState<PlanItem[]>(OFFICIAL_CALENDAR_DATA);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [activePlatformTab, setActivePlatformTab] = useState<'LinkedIn' | 'Instagram' | 'TikTok' | 'Facebook'>('LinkedIn');
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterWeek, setFilterWeek] = useState('');
+  const [filterTheme, setFilterTheme] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Check local storage, but default to official text if empty
     const storedStrategy = localStorage.getItem('veri_brand_strategy');
     if (storedStrategy) {
         setStrategyText(storedStrategy);
@@ -401,8 +357,6 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
       setPassword('');
     }
   };
-
-  // --- KNOWLEDGE BASE LOGIC ---
 
   const handleSave = () => {
     localStorage.setItem('veri_brand_strategy', strategyText);
@@ -478,86 +432,49 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
       setTimeout(() => setSuccessMsg(''), 3000);
   };
 
-  // --- PLANNER LOGIC ---
-
   const generatePlan = async () => {
-    const win = window as any;
-    if (win.aistudio) {
-        const hasKey = await win.aistudio.hasSelectedApiKey();
-        if (!hasKey) {
-            await win.aistudio.openSelectKey();
-        }
+    if (!window.google) {
+        alert("AI SDK not loaded.");
+        return;
     }
-
-    if (!process.env.API_KEY) return;
     setIsGeneratingPlan(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: {
-                parts: [{ text: `
-                    You are a Senior Content Strategist for app.microcredentials.io.
-                    Based on our STRATEGY KNOWLEDGE BASE:
-                    ${strategyText.substring(0, 10000)}... (truncated for context)
+        const session = await window.google.ai.generativeLanguage.create({ apiKey: process.env.API_KEY });
+        const model = session.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-                    Create a 7-Day Growth Content Plan using Australian English spelling and grammar (e.g. 'optimise', 'colour', 'centre').
-                    Target Audience: ${targetAudience}
-                    Goals: ${goals}
-                    Platforms: ${platforms}
+        const prompt = `
+            You are a Senior Content Strategist for app.microcredentials.io.
+            Based on our STRATEGY KNOWLEDGE BASE:
+            ${strategyText.substring(0, 10000)}... (truncated for context)
 
-                    Return a JSON array of 7 objects. Each object must have:
-                    - platform (one of 'LinkedIn', 'Instagram', 'TikTok')
-                    - week (e.g. "Custom")
-                    - day (e.g. "Day 1")
-                    - format (e.g. "Post")
-                    - theme (Short topic)
-                    - headline (Punchy overlay text, max 8 words)
-                    - visualPrompt (Detailed scene description for AI image gen, professional style)
-                    - caption (Social style, max 40 words, AU English)
-                `}]
-            },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            platform: { type: Type.STRING },
-                            week: { type: Type.STRING },
-                            day: { type: Type.STRING },
-                            format: { type: Type.STRING },
-                            theme: { type: Type.STRING },
-                            headline: { type: Type.STRING },
-                            visualPrompt: { type: Type.STRING },
-                            caption: { type: Type.STRING }
-                        }
-                    }
-                }
-            }
-        });
+            Create a 7-Day Growth Content Plan using Australian English spelling and grammar (e.g. 'optimise', 'colour', 'centre').
+            Target Audience: ${targetAudience}
+            Goals: ${goals}
+            Platforms: ${platforms}
+
+            Return a JSON array of 7 objects. Each object must have:
+            - platform (one of 'LinkedIn', 'Instagram', 'TikTok')
+            - week (e.g. "Custom")
+            - day (e.g. "Day 1")
+            - format (e.g. "Post")
+            - theme (Short topic)
+            - headline (Punchy overlay text, max 8 words)
+            - visualPrompt (Detailed scene description for AI image gen, professional style)
+            - caption (Social style, max 40 words, AU English)
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
         
-        if (response.text) {
-            // Append generated plan to existing official plan for now, or replace
-            // For this user flow, we'll just set it to view
-            const newItems = JSON.parse(response.text) as PlanItem[];
+        if (text) {
+            const newItems = JSON.parse(text) as PlanItem[];
             setGeneratedPlan([...newItems, ...OFFICIAL_CALENDAR_DATA]);
             setPlannerStep(2);
         }
     } catch (e: any) {
         console.error(e);
-        const errStr = (e.message || e.toString()).toLowerCase();
-        if (errStr.includes("403") || errStr.includes("permission_denied") || errStr.includes("400") || errStr.includes("api key not valid")) {
-           const win = window as any;
-           if (win.aistudio) {
-               await win.aistudio.openSelectKey();
-           } else {
-               alert("Permission denied. Please select a valid API key with billing enabled.");
-           }
-        } else {
-            alert("Failed to generate plan. Please try again.");
-        }
+        alert("Failed to generate plan. Please check your API key and try again.");
     } finally {
         setIsGeneratingPlan(false);
     }
@@ -569,15 +486,15 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
       
       const timestamp = new Date().toLocaleDateString().replace(/\//g, '-');
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 30, 61); // Navy
+      doc.setTextColor(15, 30, 61);
       doc.setFontSize(20);
       doc.text(`Production Schedule - ${activePlatformTab}`, 14, 22);
       
       doc.setFontSize(12);
-      doc.setTextColor(0, 191, 255); // Electric Blue
+      doc.setTextColor(0, 191, 255);
       doc.text(`app.microcredentials.io | Generated: ${timestamp}`, 14, 30);
 
-      const filteredPlan = generatedPlan.filter(p => p.platform === activePlatformTab || (activePlatformTab === 'Facebook' && p.platform === 'LinkedIn'));
+      const filteredPlan = getVisibleItems();
       
       const tableData = filteredPlan.map(row => [
           `${row.week} ${row.day}`,
@@ -586,7 +503,7 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
           row.caption
       ]);
 
-      doc.autoTable({
+      (doc as any).autoTable({
           startY: 40,
           head: [['When', 'Format', 'Headline', 'Caption']],
           body: tableData,
@@ -622,22 +539,42 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
           caption: item.caption,
           mode: mode
       });
-      // Scroll to generator
+
       const element = document.getElementById('ai-generator');
       if (element) element.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Helper to get items for current tab
-  const getVisibleItems = () => {
-      if (activePlatformTab === 'Facebook') {
-          // Fallback: Show LinkedIn content for Facebook if strictly requested, or empty
-          // Strategy usually implies crossposting RTO content to FB/LinkedIn
-          return generatedPlan.filter(item => item.platform === 'LinkedIn');
-      }
-      return generatedPlan.filter(item => item.platform === activePlatformTab);
-  };
+  const uniqueWeeks = [...new Set(OFFICIAL_CALENDAR_DATA.map(item => item.week))].sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+  const uniqueThemes = [...new Set(OFFICIAL_CALENDAR_DATA.map(item => item.theme))].sort();
 
-  // --- RENDER ---
+  const getVisibleItems = () => {
+    let items = generatedPlan;
+
+    if (activePlatformTab === 'Facebook') {
+      items = items.filter(item => item.platform === 'LinkedIn');
+    } else {
+      items = items.filter(item => item.platform === activePlatformTab);
+    }
+
+    if (filterWeek) {
+      items = items.filter(item => item.week === filterWeek);
+    }
+
+    if (filterTheme) {
+      items = items.filter(item => item.theme === filterTheme);
+    }
+
+    if (searchTerm) {
+      const lowercasedTerm = searchTerm.toLowerCase();
+      items = items.filter(item =>
+        item.headline.toLowerCase().includes(lowercasedTerm) ||
+        item.caption.toLowerCase().includes(lowercasedTerm) ||
+        item.theme.toLowerCase().includes(lowercasedTerm) ||
+        item.visualPrompt.toLowerCase().includes(lowercasedTerm)
+      );
+    }
+    return items;
+  };
 
   return (
     <div className="px-8 md:px-[70px] pb-[70px]">
@@ -646,7 +583,6 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
       </h2>
 
       <div className="bg-navy rounded-[20px] shadow-2xl overflow-hidden relative min-h-[600px]">
-        {/* Background FX */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
              <div className="absolute top-[-10%] right-[-5%] w-[300px] h-[300px] bg-electric-blue opacity-5 rounded-full blur-[60px]"></div>
         </div>
@@ -675,7 +611,6 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
         ) : (
           <div className="relative z-10 p-6 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
             
-            {/* Internal Navigation */}
             <div className="flex gap-4 mb-8 border-b border-white/10 pb-4">
                 <button 
                     onClick={() => setActiveTab('knowledge')}
@@ -764,8 +699,36 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
                                     </button>
                                 </div>
                             </div>
+                            
+                            <div className="flex gap-4 mb-4 p-4 bg-white/5 rounded-xl border border-white/10 flex-wrap">
+                                <div className="relative flex-grow min-w-[200px]">
+                                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search content, theme, headline..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="bg-black/20 border border-white/10 rounded-lg p-2 pl-10 text-white placeholder-white/40 w-full"
+                                    />
+                                </div>
+                                <select
+                                    value={filterWeek}
+                                    onChange={(e) => setFilterWeek(e.target.value)}
+                                    className="bg-black/20 border border-white/10 rounded-lg p-2 text-white min-w-[120px]"
+                                >
+                                    <option value="">All Weeks</option>
+                                    {uniqueWeeks.map(week => <option key={week} value={week}>{week}</option>)}
+                                </select>
+                                <select
+                                    value={filterTheme}
+                                    onChange={(e) => setFilterTheme(e.target.value)}
+                                    className="bg-black/20 border border-white/10 rounded-lg p-2 text-white flex-grow min-w-[150px]"
+                                >
+                                    <option value="">All Themes</option>
+                                    {uniqueThemes.map(theme => <option key={theme} value={theme}>{theme}</option>)}
+                                </select>
+                            </div>
 
-                            {/* PLATFORM TABS */}
                             <div className="flex gap-2 mb-4 bg-white/5 p-1 rounded-xl w-fit">
                                 <button onClick={() => setActivePlatformTab('LinkedIn')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors ${activePlatformTab === 'LinkedIn' ? 'bg-[#0077b5] text-white' : 'text-white/50 hover:bg-white/10'}`}>
                                     <Linkedin size={16} /> LinkedIn (RTO)
@@ -828,9 +791,7 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
                                         )) : (
                                             <tr>
                                                 <td colSpan={4} className="p-8 text-center text-white/50 italic">
-                                                    {activePlatformTab === 'Facebook' 
-                                                        ? "Displaying LinkedIn Strategy for Facebook Cross-posting..."
-                                                        : "No scheduled content found for this platform."}
+                                                    No content found for the selected filters.
                                                 </td>
                                             </tr>
                                         )}

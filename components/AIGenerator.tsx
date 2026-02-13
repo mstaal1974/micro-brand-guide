@@ -49,7 +49,8 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '3:4' | '16:9'>('1:1');
   
   // Text Tools
-  const [textPos, setTextPos] = useState({ x: 0, y: 0 }); // Percentages offset
+  const [textPos, setTextPos] = useState({ x: 0, y: 0 }); // Percentages offset for the whole block
+  const [textNudge, setTextNudge] = useState({ x: 0, y: 0 }); // Fine-tune adjustment for text inside the box
   const [textAlign, setTextAlign] = useState<'left'|'center'|'right'>('left');
   const [textYAnchor, setTextYAnchor] = useState<'top'|'middle'|'bottom'>('bottom');
   
@@ -102,7 +103,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
       if (activeTab !== 'video-gen' && image) {
           drawCanvas();
       }
-  }, [image, headline, showLogo, showOverlay, textPos, textAlign, textYAnchor, useColorOverlay, aspectRatio]);
+  }, [image, headline, showLogo, showOverlay, textPos, textAlign, textYAnchor, useColorOverlay, aspectRatio, textNudge]);
 
   // --- HELPERS ---
   const getStrategy = () => localStorage.getItem('veri_brand_strategy') || "";
@@ -248,39 +249,40 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
               const fontSize = canvas.width * 0.055; // Responsive font size
               ctx.font = `900 ${fontSize}px Montserrat`;
               
-              // Calculate Position
+              // Calculate Position for the entire block
               let textX = 60; // Margin
               let textY = canvas.height - 100; // Default bottom
 
               if (textYAnchor === 'top') textY = 250;
               if (textYAnchor === 'middle') textY = canvas.height / 2;
               
-              // Apply Manual Nudges
+              // Apply Manual Nudges for the block
               textX += textPos.x * 5;
               textY += textPos.y * 5;
 
-              // WORD WRAP LOGIC
+              // --- WORD WRAP LOGIC ---
               const safeWidth = canvas.width - 120; // 60px padding per side
               const rawPars = headline.split('\n');
               let lines: string[] = [];
 
               rawPars.forEach(par => {
-                  const words = par.split(' ');
+                  const words = par.trim().split(' ');
+                  if (!words || words.length === 0 || (words.length === 1 && words[0] === '')) return;
+
                   let currentLine = words[0];
-                  
                   for (let i = 1; i < words.length; i++) {
                       const word = words[i];
-                      const width = ctx.measureText(currentLine + " " + word).width;
-                      if (width < safeWidth) {
-                          currentLine += " " + word;
+                      const testLine = currentLine + " " + word;
+                      const testWidth = ctx.measureText(testLine).width;
+                      if (testWidth < safeWidth) {
+                          currentLine = testLine;
                       } else {
                           lines.push(currentLine);
                           currentLine = word;
                       }
                   }
-                  if (currentLine) lines.push(currentLine);
+                  lines.push(currentLine);
               });
-              // -----------------------
 
               const lineHeight = fontSize * 1.2;
               
@@ -316,8 +318,12 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
               if (textAlign === 'center') drawX = canvas.width / 2;
               if (textAlign === 'right') drawX = canvas.width - 60;
 
+              // Apply the inner text nudge
+              drawX += textNudge.x;
+              const finalDrawY = textY + textNudge.y;
+
               lines.forEach((line, i) => {
-                  ctx.fillText(line, drawX, textY + (i * lineHeight));
+                  ctx.fillText(line, drawX, finalDrawY + (i * lineHeight));
               });
 
               ctx.restore();
@@ -889,15 +895,28 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
                     </div>
 
                     {/* Nudge Sliders */}
-                    <div>
-                        <label className="text-[10px] uppercase text-white/50 mb-1 block flex items-center gap-1"><Move size={10}/> Manual Nudge</label>
-                        <div className="flex gap-2 items-center">
-                            <span className="text-xs w-4">X</span>
-                            <input type="range" min="-20" max="20" value={textPos.x} onChange={e => setTextPos({...textPos, x: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-[10px] uppercase text-white/50 mb-1 block flex items-center gap-1"><Move size={10}/> Manual Nudge (Block)</label>
+                            <div className="flex gap-2 items-center">
+                                <span className="text-xs w-4">X</span>
+                                <input type="range" min="-20" max="20" value={textPos.x} onChange={e => setTextPos({...textPos, x: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                            </div>
+                            <div className="flex gap-2 items-center mt-2">
+                                <span className="text-xs w-4">Y</span>
+                                <input type="range" min="-20" max="20" value={textPos.y} onChange={e => setTextPos({...textPos, y: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                            </div>
                         </div>
-                        <div className="flex gap-2 items-center mt-2">
-                            <span className="text-xs w-4">Y</span>
-                            <input type="range" min="-20" max="20" value={textPos.y} onChange={e => setTextPos({...textPos, y: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                        <div>
+                            <label className="text-[10px] uppercase text-white/50 mb-1 block flex items-center gap-1"><Move size={10}/> Adjust Text in Box</label>
+                            <div className="flex gap-2 items-center">
+                                <span className="text-xs w-4">X</span>
+                                <input type="range" min="-20" max="20" value={textNudge.x} onChange={e => setTextNudge({...textNudge, x: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                            </div>
+                            <div className="flex gap-2 items-center mt-2">
+                                <span className="text-xs w-4">Y</span>
+                                <input type="range" min="-20" max="20" value={textNudge.y} onChange={e => setTextNudge({...textNudge, y: parseInt(e.target.value)})} className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+                            </div>
                         </div>
                     </div>
                 </div>

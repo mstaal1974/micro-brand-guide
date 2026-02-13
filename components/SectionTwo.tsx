@@ -1,4 +1,5 @@
 import React from 'react';
+import Card from './Card';
 
 const GalleryItem: React.FC<{
   imageSrc: string;
@@ -27,14 +28,13 @@ const SectionTwo: React.FC = () => {
         02. Official Veri Imagery Library
       </h2>
 
-      <div className="bg-soft-blue border-l-4 border-gold p-6 rounded-r-lg mb-10 shadow-sm">
-        <h3 className="font-bold text-navy text-lg mb-2 font-heading uppercase tracking-wider">Usage Guidelines</h3>
+      <Card title="Usage Guidelines">
         <p className="text-navy/80 text-base leading-relaxed">
           This library emphasizes versatility. <strong className="text-navy">Core principles:</strong> All backgrounds are removed to ensure seamless integration 
           with our brand gradients or clean white space. Poses are categorized by intent (Teaching, Vision, Connection, Authority) 
           to match specific communication goals. Maintain a balance between approachability and professional distance.
         </p>
-      </div>
+      </Card>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-9 my-12">
         {/* Welcome / Teaching Pose */}

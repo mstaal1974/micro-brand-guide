@@ -1,5 +1,6 @@
 import React from 'react';
 import { Type, Layout, MousePointer2 } from 'lucide-react';
+import Card from './Card';
 
 const Typography: React.FC = () => {
   return (
@@ -8,14 +9,11 @@ const Typography: React.FC = () => {
         04. Typography & Layout
       </h2>
 
-      <div className="bg-soft-blue border-l-4 border-gold p-6 rounded-r-lg mb-10 shadow-sm">
-        <h3 className="font-bold text-navy text-lg mb-2 font-heading uppercase tracking-wider flex items-center gap-2">
-            <Type size={20}/> The Voice of Veri
-        </h3>
-        <p className="text-navy/80 text-base leading-relaxed">
+      <Card title="The Voice of Veri" icon={<Type size={20} />}>
+        <p>
           Our typography balances <strong>authority</strong> with <strong>clarity</strong>. We use <span className="font-montserrat font-bold">Montserrat</span> for bold, impactful headlines that demand attention, and <span className="font-opensans">Open Sans</span> for clean, readable body copy that builds trust.
         </p>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         
