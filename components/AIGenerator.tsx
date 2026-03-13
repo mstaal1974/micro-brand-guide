@@ -130,7 +130,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
     setFeedbackStatus(type);
     
     // Create a snapshot of the current successful/unsuccessful generation settings
-    const entry = `Prompt: "${prompt}", Headline: "${headline}", AspectRatio: ${aspectRatio}, UseVeri: ${useVeri}`;
+    const entry = `Prompt: \"${prompt}\", Headline: \"${headline}\", AspectRatio: ${aspectRatio}, UseVeri: ${useVeri}`;
     
     const key = type === 'liked' ? 'veri_ai_likes' : 'veri_ai_dislikes';
     const history = JSON.parse(localStorage.getItem(key) || "[]");
@@ -371,8 +371,8 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const result = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
-              contents: { parts: [{ text: `Fix spelling and grammar to Australian English standards (e.g. 'colour', 'organise', 'program'). Keep it punchy (max 8 words). Return ONLY the corrected text: "${headline}"` }] }
+              model: 'gemini-3.1-pro-preview',
+              contents: { parts: [{ text: `Fix spelling and grammar to Australian English standards (e.g. 'colour', 'organise', 'program'). Keep it punchy (max 8 words). Return ONLY the corrected text: \"${headline}\"` }] }
           });
           if (result.text) setHeadline(result.text.trim());
       } catch (e) { handleApiError(e, "Grammar fix failed."); }
@@ -385,13 +385,13 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const result = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.1-pro-preview',
             contents: { parts: [{ text: `
               Audit this caption against the Veri Brand Persona (Confident, Intelligent, Human-Centric, Professional, Not Robotic).
               Ensure Australian English spelling/grammar is used (e.g. 'colour', 'optimise').
               
               Strategy Context: ${getStrategy().substring(0, 500)}
-              Caption to Audit: "${caption}"
+              Caption to Audit: \"${caption}\"
 
               Output strict JSON:
               {
@@ -422,7 +422,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const result = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.1-pro-preview',
               contents: { parts: [{ text: `
                 Act as a Senior Social Media Manager for app.microcredentials.io.
                 Write a compelling social media caption (LinkedIn/Twitter style) for a post.
@@ -490,7 +490,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
              const ref = await fetchReferenceImage();
              const refData = ref.split(',')[1];
              const resp = await ai.models.generateContent({
-                 model: 'gemini-2.5-flash-image',
+                 model: 'gemini-3.1-pro-preview',
                  contents: { parts: [
                      { inlineData: { mimeType: 'image/jpeg', data: refData } },
                      { text: `Character Reference: Use the woman in this image (Veri). 
@@ -516,7 +516,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
               `;
 
               const resp = await ai.models.generateContent({
-                  model: 'gemini-2.5-flash-image',
+                  model: 'gemini-3.1-pro-preview',
                   contents: { parts: [{ text: strictPrompt }] },
                   config: { imageConfig: imgConfig }
               });
@@ -549,7 +549,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
 
           const refinePrompt = `
              EDIT INSTRUCTIONS: The user wants to modify the provided image.
-             User Instruction: "${prompt}"
+             User Instruction: \"${prompt}\"
              
              Constraints:
              1. Maintain the current composition and character as much as possible, unless explicitly asked to change.
@@ -559,7 +559,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
           `;
 
           const resp = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-image',
+              model: 'gemini-3.1-pro-preview',
               contents: { parts: [
                   { inlineData: { mimeType: 'image/jpeg', data: imageData } },
                   { text: refinePrompt }
@@ -593,7 +593,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
           const sceneData = remixImage.split(',')[1];
 
           const resp = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-image',
+              model: 'gemini-3.1-pro-preview',
               contents: { parts: [
                   { inlineData: { mimeType: 'image/jpeg', data: veriData } },
                   { inlineData: { mimeType: 'image/jpeg', data: sceneData } },
