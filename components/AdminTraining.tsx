@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Unlock, Save, Upload, FileText, ShieldCheck, AlertCircle, Link as LinkIcon, Plus, X, Trash2, Calendar, Wand2, Download, ArrowUpRight, Play, Linkedin, Instagram, Facebook, Video, Search } from 'lucide-react';
+import * as replicate from '../lib/replicate';
 
 declare global {
   interface Window {
@@ -433,15 +434,8 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
   };
 
   const generatePlan = async () => {
-    if (!window.google) {
-        alert("AI SDK not loaded.");
-        return;
-    }
     setIsGeneratingPlan(true);
     try {
-        const session = await window.google.ai.generativeLanguage.create({ apiKey: process.env.API_KEY });
-        const model = session.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
         const prompt = `
             You are a Senior Content Strategist for app.microcredentials.io.
             Based on our STRATEGY KNOWLEDGE BASE:
@@ -452,7 +446,7 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
             Goals: ${goals}
             Platforms: ${platforms}
 
-            Return a JSON array of 7 objects. Each object must have:
+            Return a JSON array of 7 objects ONLY (no prose, no markdown fences). Each object must have:
             - platform (one of 'LinkedIn', 'Instagram', 'TikTok')
             - week (e.g. "Custom")
             - day (e.g. "Day 1")
@@ -463,18 +457,17 @@ const AdminTraining: React.FC<AdminTrainingProps> = ({ onSendToAI }) => {
             - caption (Social style, max 40 words, AU English)
         `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        
-        if (text) {
-            const newItems = JSON.parse(text) as PlanItem[];
-            setGeneratedPlan([...newItems, ...OFFICIAL_CALENDAR_DATA]);
-            setPlannerStep(2);
-        }
+        const text = await replicate.generateText({ prompt, maxTokens: 2048 });
+        const cleaned = text.replace(/```json|```/g, '').trim();
+        const start = cleaned.indexOf('[');
+        const end = cleaned.lastIndexOf(']');
+        if (start < 0 || end <= start) throw new Error('Model did not return a JSON array.');
+        const newItems = JSON.parse(cleaned.slice(start, end + 1)) as PlanItem[];
+        setGeneratedPlan([...newItems, ...OFFICIAL_CALENDAR_DATA]);
+        setPlannerStep(2);
     } catch (e: any) {
         console.error(e);
-        alert("Failed to generate plan. Please check your API key and try again.");
+        alert(`Failed to generate plan: ${e?.message || e}`);
     } finally {
         setIsGeneratingPlan(false);
     }

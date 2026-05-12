@@ -19,8 +19,8 @@ const Header: React.FC = () => {
             </p>
             
             <nav className="mt-10 flex flex-wrap justify-center gap-4 md:gap-8 text-sm md:text-base font-bold tracking-wide">
-                {['Character', 'Imagery', 'Examples', 'Typography', 'AI Generator', 'Colors', 'Strategy'].map((item) => (
-                    <button 
+                {['Character', 'Imagery', 'Examples', 'Typography', 'AI Generator', 'Approvals', 'Colors', 'Strategy'].map((item) => (
+                    <button
                         key={item}
                         onClick={() => scrollToSection(item.toLowerCase().replace(' ', '-'))}
                         className="text-white/70 hover:text-electric-blue transition-colors border-b-2 border-transparent hover:border-electric-blue py-1"

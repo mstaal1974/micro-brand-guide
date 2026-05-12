@@ -9,6 +9,8 @@ import AIGenerator from './components/AIGenerator';
 import BrandColors from './components/BrandColors';
 import AdminTraining from './components/AdminTraining';
 import Footer from './components/Footer';
+import AuthBar from './components/AuthBar';
+import ApprovalQueue from './components/ApprovalQueue';
 
 export interface PrefillData {
   scenePrompt?: string;
@@ -23,6 +25,7 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-[1150px] mx-auto bg-white shadow-2xl min-h-screen flex flex-col">
+      <AuthBar />
       <Header />
       <main className="flex-grow">
         <section id="character">
@@ -40,6 +43,7 @@ const App: React.FC = () => {
         <section id="ai-generator" className="scroll-mt-32">
             <AIGenerator prefillData={generatorPrefill} />
         </section>
+        <ApprovalQueue />
         <section id="colors">
             <BrandColors />
         </section>
