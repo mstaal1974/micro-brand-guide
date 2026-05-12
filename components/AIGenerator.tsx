@@ -1,8 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
-import { Upload, RefreshCw, Sparkles, Image as ImageIcon, Wand2, Video, Download, Layers, FileText, Copy, Square, RectangleVertical, RectangleHorizontal, Check, Move, ThumbsUp, ThumbsDown, Linkedin, Smartphone, Eye, Monitor, ShieldCheck, Pencil, Facebook } from 'lucide-react';
+import { Upload, RefreshCw, Sparkles, Image as ImageIcon, Wand2, Video, Download, Layers, FileText, Copy, Square, RectangleVertical, RectangleHorizontal, Check, Move, ThumbsUp, ThumbsDown, Linkedin, Smartphone, Eye, Monitor, ShieldCheck, Pencil, Facebook, Send } from 'lucide-react';
 import { PrefillData } from '../App';
+import * as replicate from '../lib/replicate';
+import { useOrg } from '../lib/OrgContext';
+import PostComposer from './PostComposer';
 
 const VERI_REF_URL = "https://raw.githubusercontent.com/mstaal1974/Brand-Guide-/main/assets/Veri%20Portrait.jpg";
 const LOGO_URL = "https://raw.githubusercontent.com/mstaal1974/Brand-Guide-/main/assets/micro%20logo.png";
@@ -19,12 +21,14 @@ interface AIGeneratorProps {
 }
 
 const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
+  const { configured: hasSupabase, currentOrg } = useOrg();
   // --- STATES ---
   const [activeTab, setActiveTab] = useState<'upload' | 'image-gen' | 'remix' | 'video-gen'>('image-gen');
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<'none' | 'liked' | 'disliked'>('none');
   const [previewMode, setPreviewMode] = useState<'editor' | 'linkedin' | 'facebook' | 'instagram'>('editor');
+  const [showSubmit, setShowSubmit] = useState(false);
 
   // Content State
   const [image, setImage] = useState<string | null>(null); // Base64 or URL
@@ -155,35 +159,15 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
     });
   };
 
-  const checkApiKey = async () => {
-      const win = window as any;
-      if (win.aistudio) {
-          const hasKey = await win.aistudio.hasSelectedApiKey();
-          if (!hasKey) {
-              await win.aistudio.openSelectKey();
-          }
-      }
-  };
-
-  const handleApiError = async (e: any, defaultMsg: string) => {
+  const handleApiError = (e: any, defaultMsg: string) => {
       console.error(e);
-      const errStr = (e.message || e.toString()).toLowerCase();
-      const isAuthError = 
-        errStr.includes("403") || 
-        errStr.includes("permission_denied") || 
-        errStr.includes("400") || 
-        errStr.includes("api_key_invalid") || 
-        errStr.includes("api key not valid");
-
-      if (isAuthError) {
-          const win = window as any;
-          if (win.aistudio) {
-              await win.aistudio.openSelectKey();
-          } else {
-              alert("API Error: Permission denied or Invalid Key. Please check your API key settings.");
-          }
+      const msg = e?.message || String(e);
+      if (msg.includes('REPLICATE_API_TOKEN')) {
+          alert('Replicate is not configured. Set REPLICATE_API_TOKEN in .env.local.');
+      } else if (e?.status === 401 || e?.status === 403) {
+          alert('Replicate auth failed. Check REPLICATE_API_TOKEN.');
       } else {
-          alert(defaultMsg);
+          alert(`${defaultMsg}\n\n${msg}`);
       }
   };
 
@@ -366,44 +350,38 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   };
 
   const fixGrammar = async () => {
-      await checkApiKey();
-      if (!headline || !process.env.API_KEY) return;
+      if (!headline) return;
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          const result = await ai.models.generateContent({
-              model: 'gemini-3.1-pro-preview',
-              contents: { parts: [{ text: `Fix spelling and grammar to Australian English standards (e.g. 'colour', 'organise', 'program'). Keep it punchy (max 8 words). Return ONLY the corrected text: \"${headline}\"` }] }
+          const text = await replicate.generateText({
+              prompt: `Fix spelling and grammar to Australian English standards (e.g. 'colour', 'organise', 'program'). Keep it punchy (max 8 words). Return ONLY the corrected text with no quotes or commentary: "${headline}"`,
+              maxTokens: 80,
           });
-          if (result.text) setHeadline(result.text.trim());
+          if (text) setHeadline(text.trim().replace(/^"|"$/g, ''));
       } catch (e) { handleApiError(e, "Grammar fix failed."); }
   };
 
   const auditVoice = async () => {
-    await checkApiKey();
-    if (!caption || !process.env.API_KEY) return;
+    if (!caption) return;
     setLoading(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const result = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
-            contents: { parts: [{ text: `
+        const txt = await replicate.generateText({
+            prompt: `
               Audit this caption against the Veri Brand Persona (Confident, Intelligent, Human-Centric, Professional, Not Robotic).
               Ensure Australian English spelling/grammar is used (e.g. 'colour', 'optimise').
-              
-              Strategy Context: ${getStrategy().substring(0, 500)}
-              Caption to Audit: \"${caption}\"
 
-              Output strict JSON:
-              {
-                "score": number (0-100),
-                "critique": "Short actionable advice (max 1 sentence) on how to improve tone."
-              }
-            ` }] }
+              Strategy Context: ${getStrategy().substring(0, 500)}
+              Caption to Audit: "${caption}"
+
+              Output strict JSON ONLY (no markdown), shaped exactly:
+              {"score": <0-100 integer>, "critique": "<one sentence>"}
+            `,
+            maxTokens: 200,
         });
-        
-        const txt = result.text?.replace(/```json|```/g, '').trim();
-        if (txt) {
-            const data = JSON.parse(txt);
+        const cleaned = txt.replace(/```json|```/g, '').trim();
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            const data = JSON.parse(cleaned.slice(start, end + 1));
             setVoiceScore(data.score);
             setVoiceCritique(data.critique);
         }
@@ -415,23 +393,19 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   };
 
   const generateSocialCaption = async () => {
-      await checkApiKey();
-      if (!process.env.API_KEY) return;
       setLoading(true);
-      setVoiceScore(null); // Reset audit
+      setVoiceScore(null);
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          const result = await ai.models.generateContent({
-              model: 'gemini-3.1-pro-preview',
-              contents: { parts: [{ text: `
+          const text = await replicate.generateText({
+              prompt: `
                 Act as a Senior Social Media Manager for app.microcredentials.io.
                 Write a compelling social media caption (LinkedIn/Twitter style) for a post.
-                
+
                 Visual Description: ${prompt}
                 Headline Overlay: ${headline}
                 Brand Strategy Context: ${getStrategy().substring(0, 1000)}
                 ${getUserPreferences()}
-                
+
                 Requirements:
                 1. Hook the reader immediately.
                 2. Provide value or insight related to verifiable credentials/blockchain/education.
@@ -440,10 +414,13 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
                 5. Structure: concise paragraphs, use emojis sparingly if appropriate for professional context.
                 6. CRITICAL: END WITH 3-5 RELEVANT HASHTAGS (e.g., #Microcredentials #EdTech).
                 7. Total length: Under 150 words.
-              ` }] }
+
+                Return ONLY the caption text.
+              `,
+              maxTokens: 400,
           });
-          if (result.text) setCaption(result.text.trim());
-      } catch (e) { 
+          if (text) setCaption(text.trim());
+      } catch (e) {
           handleApiError(e, "Caption generation failed.");
       } finally {
           setLoading(false);
@@ -470,106 +447,47 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   // --- GENERATION ---
 
   const generateImage = async () => {
-      await checkApiKey();
-      if (!process.env.API_KEY) return;
       setLoading(true);
       setFeedbackStatus('none');
-      setStatusMsg("Consulting brand strategy & generating visual...");
-      
+      setStatusMsg("Consulting brand strategy & generating visual via Replicate Flux...");
+
+      const basePromptContext = `Context: ${getStrategy().substring(0, 500)}. ${getUserPreferences()}`;
+      const styleRules = `Photorealistic corporate image. Soft confident professional studio lighting. Palette dominated by Navy Blue (#0F1E3D), White, with touches of Electric Blue. Professional textured fabrics, suits, blazers.`;
+
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          let imageBlob = "";
-          const imgConfig = { aspectRatio: aspectRatio };
-
-          const basePromptContext = `
-            Context: ${getStrategy().substring(0, 500)}. 
-            ${getUserPreferences()}
-          `;
-
-          if (useVeri) {
-             const ref = await fetchReferenceImage();
-             const refData = ref.split(',')[1];
-             const resp = await ai.models.generateContent({
-                 model: 'gemini-3.1-pro-preview',
-                 contents: { parts: [
-                     { inlineData: { mimeType: 'image/jpeg', data: refData } },
-                     { text: `Character Reference: Use the woman in this image (Veri). 
-                     Generate a photorealistic corporate shot of her: ${prompt}. 
-                     ${basePromptContext}
-                     Style: High-end, navy/blue tones, soft lighting. Aspect Ratio: ${aspectRatio}.` }
-                 ]},
-                 config: { imageConfig: imgConfig }
-             });
-             const part = resp.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-             if (part?.inlineData) imageBlob = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          } else {
-              // Strict Brand Fallback
-              const strictPrompt = `
-              Generate a photorealistic corporate image: ${prompt}. 
-              ${basePromptContext}
-              Style Rules: 
-              1. Photorealistic rendering ONLY (No cartoons/illustrations).
-              2. Lighting: Soft, confident, professional studio lighting.
-              3. Palette: Dominated by Navy Blue (#0F1E3D), White, and touches of Electric Blue.
-              4. Wardrobe: Professional textured fabrics, suits, blazers.
-              5. Aspect Ratio: ${aspectRatio}.
-              `;
-
-              const resp = await ai.models.generateContent({
-                  model: 'gemini-3.1-pro-preview',
-                  contents: { parts: [{ text: strictPrompt }] },
-                  config: { imageConfig: imgConfig }
-              });
-              const part = resp.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-              if (part?.inlineData) imageBlob = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          }
-
-          if (imageBlob) setImage(imageBlob);
-
+          const fullPrompt = useVeri
+            ? `Photorealistic corporate shot of Veri (the recurring brand spokeswoman, a confident professional woman with the same face/hair as the reference): ${prompt}. ${styleRules} ${basePromptContext}`
+            : `${prompt}. ${styleRules} ${basePromptContext}`;
+          const ref = useVeri ? await fetchReferenceImage() : undefined;
+          const url = await replicate.generateImage({
+              prompt: fullPrompt,
+              aspectRatio,
+              referenceImage: ref,
+              onTick: s => setStatusMsg(`Replicate ${s}...`),
+          });
+          setImage(url);
       } catch (e) {
-          handleApiError(e, "Image generation failed. Check Quota/API Key.");
+          handleApiError(e, "Image generation failed.");
       } finally {
           setLoading(false);
       }
   };
 
   const refineImage = async () => {
-      await checkApiKey();
-      if (!process.env.API_KEY || !image) return;
+      if (!image) return;
       setLoading(true);
       setFeedbackStatus('none');
-      setStatusMsg("Refining current asset based on instructions...");
-      
+      setStatusMsg("Refining current asset with Flux Redux...");
+
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          
-          // Get current image data
-          const imageData = image.split(',')[1];
-          const imgConfig = { aspectRatio: aspectRatio };
-
-          const refinePrompt = `
-             EDIT INSTRUCTIONS: The user wants to modify the provided image.
-             User Instruction: \"${prompt}\"
-             
-             Constraints:
-             1. Maintain the current composition and character as much as possible, unless explicitly asked to change.
-             2. Keep photorealistic professional quality.
-             3. Adhere to Australian English if text is involved.
-             4. ${getUserPreferences()}
-          `;
-
-          const resp = await ai.models.generateContent({
-              model: 'gemini-3.1-pro-preview',
-              contents: { parts: [
-                  { inlineData: { mimeType: 'image/jpeg', data: imageData } },
-                  { text: refinePrompt }
-              ]},
-              config: { imageConfig: imgConfig }
+          const refinePrompt = `Refine and re-render this image. User Instruction: "${prompt}". Maintain the original composition and characters unless asked to change. Photorealistic, professional, navy/blue brand palette. ${getUserPreferences()}`;
+          const url = await replicate.generateImage({
+              prompt: refinePrompt,
+              aspectRatio,
+              referenceImage: image,
+              onTick: s => setStatusMsg(`Replicate ${s}...`),
           });
-          
-          const part = resp.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-          if (part?.inlineData) setImage(`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`);
-
+          setImage(url);
       } catch (e) {
           handleApiError(e, "Refinement failed.");
       } finally {
@@ -578,40 +496,24 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   };
 
   const generateRemix = async () => {
-      await checkApiKey();
-      if (!process.env.API_KEY || !remixImage) return;
+      if (!remixImage) return;
       setLoading(true);
       setFeedbackStatus('none');
       setStatusMsg("Remixing scene with Veri...");
-      
+
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          
-          // Get Veri Ref
           const veriRef = await fetchReferenceImage();
-          const veriData = veriRef.split(',')[1];
-          const sceneData = remixImage.split(',')[1];
-
-          const resp = await ai.models.generateContent({
-              model: 'gemini-3.1-pro-preview',
-              contents: { parts: [
-                  { inlineData: { mimeType: 'image/jpeg', data: veriData } },
-                  { inlineData: { mimeType: 'image/jpeg', data: sceneData } },
-                  { text: `
-                    Image 1 is the Character Reference (Veri).
-                    Image 2 is the Composition Reference (Scene/Pose).
-                    Task: Recreate the scene in Image 2 but replace the main subject with Veri from Image 1.
-                    Maintain the pose, lighting direction, and environment of Image 2.
-                    ${getUserPreferences()}
-                    Ensure the result is photorealistic and matches the brand navy/blue aesthetic.
-                  ` }
-              ]},
-              config: { imageConfig: { aspectRatio: aspectRatio } }
+          // Flux Redux conditions on a single image; we use the scene as the
+          // structural reference and describe Veri verbally in the prompt to
+          // preserve her likeness.
+          const url = await replicate.remixImages({
+              prompt: `Photorealistic recreation of this scene/pose but with Veri (the recurring brand spokeswoman: confident professional woman, navy/blue tones) as the main subject. Maintain pose, lighting, and environment. ${getUserPreferences()}`,
+              aspectRatio,
+              characterImage: veriRef,
+              sceneImage: remixImage,
+              onTick: s => setStatusMsg(`Replicate ${s}...`),
           });
-          
-          const part = resp.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-          if (part?.inlineData) setImage(`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`);
-
+          setImage(url);
       } catch (e) {
           handleApiError(e, "Remix failed.");
       } finally {
@@ -620,40 +522,18 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
   };
 
   const generateVideo = async () => {
-      await checkApiKey();
-
       setLoading(true);
       setFeedbackStatus('none');
-      setStatusMsg("Initializing Veo Model...");
-      
+      setStatusMsg("Submitting to Kling v2.1 (this can take a minute)...");
+
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          setStatusMsg("Veo is dreaming (this takes ~1 min)...");
-          
-          let videoRatio = '16:9';
-          if (aspectRatio === '3:4') videoRatio = '9:16';
-          
-          let operation = await ai.models.generateVideos({
-              model: 'veo-3.1-fast-generate-preview',
+          const url = await replicate.generateVideo({
               prompt: `Cinematic corporate video, stable camera. ${prompt}. Professional lighting, navy and blue tones. ${getUserPreferences()}`,
-              config: {
-                  numberOfVideos: 1,
-                  resolution: '1080p',
-                  aspectRatio: videoRatio
-              }
+              aspectRatio,
+              startImage: image || undefined,
+              onTick: s => setStatusMsg(`Kling ${s}...`),
           });
-
-          while (!operation.done) {
-              await new Promise(r => setTimeout(r, 5000));
-              setStatusMsg("Rendering frames...");
-              operation = await ai.operations.getVideosOperation({ operation });
-          }
-
-          const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-          if (videoUri) {
-               setVideoUrl(`${videoUri}&key=${process.env.API_KEY}`);
-          }
-
+          setVideoUrl(url);
       } catch (e) {
           handleApiError(e, "Video generation failed.");
       } finally {
@@ -968,9 +848,21 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
                     </div>
                 </div>
                 
-                <button onClick={handleDownload} disabled={(!image && !videoUrl)} className="mt-auto bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Download size={20}/> Download Final Asset
-                </button>
+                <div className="mt-auto flex flex-col gap-2">
+                    {hasSupabase && (
+                        <button
+                            onClick={() => setShowSubmit(true)}
+                            disabled={(!image && !videoUrl) || !currentOrg}
+                            title={!currentOrg ? 'Select an organisation first' : 'Submit for approval'}
+                            className="bg-electric-blue hover:bg-[#00d4ff] text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Send size={18}/> Submit for Approval
+                        </button>
+                    )}
+                    <button onClick={handleDownload} disabled={(!image && !videoUrl)} className="bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Download size={20}/> Download Final Asset
+                    </button>
+                </div>
 
             </div>
 
@@ -1150,6 +1042,15 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
             )}
         </div>
       </div>
+      {showSubmit && (
+        <PostComposer
+          assetUrl={activeTab === 'video-gen' ? videoUrl : (previewDataUrl || image)}
+          assetKind={activeTab === 'video-gen' ? 'video' : 'image'}
+          headline={headline}
+          caption={caption}
+          onClose={() => setShowSubmit(false)}
+        />
+      )}
     </div>
   );
 };
