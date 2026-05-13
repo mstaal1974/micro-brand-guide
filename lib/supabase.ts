@@ -1,18 +1,42 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const URL = process.env.SUPABASE_URL || '';
-const ANON = process.env.SUPABASE_ANON_KEY || '';
+// Supabase's auth/rest endpoints live at fixed paths off the project origin
+// (e.g. /auth/v1/token, /rest/v1/...). If SUPABASE_URL was pasted with any
+// extra path or trailing slash, the SDK appends to it and the server returns
+// 404 "Invalid path specified in request URL". Strip everything but origin.
+function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  try {
+    const u = new URL(trimmed);
+    if (u.pathname && u.pathname !== '/') {
+      console.warn(
+        `[supabase] SUPABASE_URL contained a path (${u.pathname}); using origin only: ${u.origin}`
+      );
+    }
+    return u.origin;
+  } catch {
+    // Bare host without scheme — assume https.
+    if (!/^https?:\/\//.test(trimmed)) {
+      try { return new URL(`https://${trimmed}`).origin; } catch { /* fall through */ }
+    }
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
+const URL_VALUE = normalizeUrl(process.env.SUPABASE_URL || '');
+const ANON = (process.env.SUPABASE_ANON_KEY || '').trim();
 
 let client: SupabaseClient | null = null;
 
 export function supabase(): SupabaseClient {
   if (!client) {
-    if (!URL || !ANON) {
+    if (!URL_VALUE || !ANON) {
       throw new Error(
         'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local.'
       );
     }
-    client = createClient(URL, ANON, {
+    client = createClient(URL_VALUE, ANON, {
       auth: { persistSession: true, autoRefreshToken: true },
     });
   }
@@ -20,7 +44,11 @@ export function supabase(): SupabaseClient {
 }
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(URL && ANON);
+  return Boolean(URL_VALUE && ANON);
+}
+
+export function getSupabaseUrl(): string {
+  return URL_VALUE;
 }
 
 // --- Domain types (mirror db/schema.sql) ---
