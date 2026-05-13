@@ -553,7 +553,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
       <div className="bg-white rounded-[20px] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[700px]">
         
         {/* LEFT PANEL: CONTROLS */}
-        <div className="w-full lg:w-[450px] bg-navy flex flex-col text-white max-h-[900px]">
+        <div className="w-full lg:w-[450px] bg-navy flex flex-col text-white">
             
             {/* Fixed Header */}
             <div className="p-6 md:p-8 pb-4 bg-navy z-10 shadow-sm shrink-0">
@@ -574,7 +574,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ prefillData }) => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="p-6 md:p-8 pt-0 flex-1 overflow-y-auto flex flex-col gap-6">
+            <div className="p-6 md:p-8 pt-0 flex-1 flex flex-col gap-6">
 
                 {/* Content Controls */}
                 {activeTab === 'upload' && (
