@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
 import { LogIn, LogOut, Plus, Building2, ChevronDown } from 'lucide-react';
 import { useOrg } from '../lib/OrgContext';
+import { getSupabaseUrl } from '../lib/supabase';
+
+function explainAuthError(raw: string): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes('invalid path')) {
+    return `Supabase rejected the request URL. Check that SUPABASE_URL points only at your project origin (e.g. https://abcd1234.supabase.co) with no path. Currently: ${getSupabaseUrl() || '(unset)'}`;
+  }
+  if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
+    return `Could not reach Supabase at ${getSupabaseUrl() || '(unset)'}. Check the URL and that the project is not paused.`;
+  }
+  if (msg.includes('invalid login credentials')) {
+    return 'Email or password is incorrect.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Email not confirmed. Check your inbox for the confirmation link, or disable confirmations in Supabase Auth settings.';
+  }
+  return raw;
+}
 
 const AuthBar: React.FC = () => {
   const { configured, user, orgs, currentOrgId, currentOrg, currentRole, setCurrentOrgId, signIn, signUp, signOut, createOrg } = useOrg();
@@ -27,7 +45,7 @@ const AuthBar: React.FC = () => {
       if (mode === 'signin') await signIn(email, password);
       else await signUp(email, password);
       setEmail(''); setPassword('');
-    } catch (e: any) { setError(e?.message || String(e)); }
+    } catch (e: any) { setError(explainAuthError(e?.message || String(e))); }
     finally { setBusy(false); }
   };
 
@@ -38,7 +56,7 @@ const AuthBar: React.FC = () => {
     try {
       await createOrg(orgName.trim());
       setOrgName(''); setShowNewOrg(false);
-    } catch (e: any) { setError(e?.message || String(e)); }
+    } catch (e: any) { setError(explainAuthError(e?.message || String(e))); }
     finally { setBusy(false); }
   };
 
