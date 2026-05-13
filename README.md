@@ -38,11 +38,27 @@ All generation is routed through `lib/replicate.ts`:
 | Video | `kwaivgi/kling-v2.1` |
 | Captions, grammar fix, voice audit, 7-day plan | `meta/meta-llama-3.1-405b-instruct` |
 
-> **CORS note** – Calling Replicate directly from the browser only works when
-> the page is served from an origin allow-listed by your Replicate account, or
-> when you front the API with your own proxy. Point `REPLICATE_PROXY_URL` at a
-> proxy that adds `Authorization: Bearer $REPLICATE_API_TOKEN` server-side for
-> a real deployment.
+### Production: serverless proxy
+
+`api/replicate/[...path].ts` is a Vercel Edge function that forwards every
+request under `/api/replicate/*` to `https://api.replicate.com/*` and injects
+`Authorization: Bearer $REPLICATE_API_TOKEN` server-side. Use it like this:
+
+1. Deploy the repo to Vercel (it auto-detects Vite + the `/api` folder; the
+   committed `vercel.json` pins this).
+2. In **Project Settings → Environment Variables** add
+   `REPLICATE_API_TOKEN` = your real token. **Do not** also add it as a build
+   variable — `vite.config.ts` only bundles values from `.env*` files, so a
+   Vercel-set env var stays server-only.
+3. Add a `REPLICATE_PROXY_URL` build variable set to `/api/replicate`. This is
+   the only Replicate-related value the browser sees; the bundle never
+   contains the token.
+4. (Optional) Test the proxy locally with `vercel dev` instead of
+   `npm run dev` so the `/api/*` route is served too.
+
+For local dev without the proxy, leave `REPLICATE_PROXY_URL` blank in
+`.env.local` and the client will call Replicate directly with the token from
+`REPLICATE_API_TOKEN` (browser CORS permitting).
 
 ## Organisations, users, and approvals
 
@@ -59,6 +75,8 @@ All generation is routed through `lib/replicate.ts`:
 
 ```
 App.tsx                Top-level page composition
+api/
+  replicate/[...path].ts  Vercel Edge proxy that adds Authorization
 components/
   AIGenerator.tsx      Image/video/caption generator (Replicate)
   AdminTraining.tsx    Strategy hub + 7-day plan generator (Replicate)
@@ -70,4 +88,5 @@ lib/
   supabase.ts          Supabase client + domain types
   OrgContext.tsx       Auth + current-org React context
 db/schema.sql          Supabase schema with row-level security
+vercel.json            Vite framework + SPA fallback, leaves /api/* intact
 ```

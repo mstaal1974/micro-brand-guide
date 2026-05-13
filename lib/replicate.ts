@@ -7,6 +7,8 @@
 const TOKEN = process.env.REPLICATE_API_TOKEN || '';
 const PROXY = process.env.REPLICATE_PROXY_URL || '';
 const BASE = PROXY ? PROXY.replace(/\/$/, '') : 'https://api.replicate.com';
+// When proxying, the server injects Authorization; never ship the token to the browser.
+const USE_DIRECT = !PROXY;
 
 // Model versions can change; these slugs use the latest stable channel.
 export const MODELS = {
@@ -24,25 +26,21 @@ export class ReplicateError extends Error {
   }
 }
 
-function requireToken(): string {
-  if (!TOKEN) {
-    throw new ReplicateError(
-      'REPLICATE_API_TOKEN is not set. Add it to .env.local and restart the dev server.'
-    );
-  }
-  return TOKEN;
-}
-
 async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${requireToken()}`,
-      'Content-Type': 'application/json',
-      Prefer: 'wait=60', // request synchronous response when supported
-      ...(init.headers || {}),
-    },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Prefer: 'wait=60', // request synchronous response when supported
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (USE_DIRECT) {
+    if (!TOKEN) {
+      throw new ReplicateError(
+        'Replicate is not configured. Set REPLICATE_PROXY_URL (recommended) or REPLICATE_API_TOKEN in .env.local.'
+      );
+    }
+    headers.Authorization = `Bearer ${TOKEN}`;
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const txt = await res.text().catch(() => res.statusText);
     throw new ReplicateError(`Replicate ${res.status}: ${txt}`, res.status);
@@ -203,5 +201,5 @@ export async function generateText(opts: {
 }
 
 export function isConfigured(): boolean {
-  return Boolean(TOKEN);
+  return Boolean(PROXY || TOKEN);
 }
